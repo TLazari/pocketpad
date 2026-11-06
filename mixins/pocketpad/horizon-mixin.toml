@@ -1,0 +1,69 @@
+[mod]
+id = "pocketpad"
+version = "1.0.0"
+priority = 100
+
+# Testado nesta revisão (Nightly 2026-10-30). Além dos hook points estáveis, o
+# mod chama `Game::pad_command` (o controle virtual de horizon-ctl) e lê a vida
+# do jogador: internos que podem mudar em outra revisão.
+[compatibility]
+horizon_revision = "ba6344a59cb9e755b730dcf02285fc0d33b97d3c"
+
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "pocketpad"
+source = "runtime.rs"
+
+# No início de poll_control (uma vez por iteração do loop): controle, ações do
+# celular, estado e chat. Ali o helper enxerga os comandos de controle do jogo.
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::control::Game<'_>::poll_control"
+helper = "tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "event_loop", ty = "&winit::event_loop::ActiveEventLoop", value = "event_loop" },
+]
+
+# A vibração que o jogo pede ao controle, repassada ao celular.
+[[injection]]
+id = "rumble"
+kind = "HEAD"
+target = "horizon_client::game::pad::Game<'_>::pad_rumble"
+helper = "rumble.rs"
+bindings = [
+  { name = "rumble", ty = "horizon_client::gamepad::Rumble", value = "rumble" },
+]
+
+[[injection]]
+id = "hud"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_hud"
+helper = "hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "corners", ty = "&mut horizon_client::extras_hud::Corners", value = "&mut *corners" },
+]
+
+[[injection]]
+id = "command"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_command"
+helper = "command.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "command", ty = "&str", value = "command" },
+  { name = "ran", ty = "&mut bool", value = "&mut *ran" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]

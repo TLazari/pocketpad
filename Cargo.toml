@@ -1,0 +1,11 @@
+[package]
+name = "horizon-mod-pocketpad"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Native mod do Horizon: o celular vira o controle, olhando para a tela do PC."
+
+# A lógica do mod e os testes: o mesmo arquivo que o bundle injeta no jogo.
+[lib]
+path = "mixins/pocketpad/runtime.rs"
