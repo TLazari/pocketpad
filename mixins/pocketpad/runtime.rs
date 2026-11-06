@@ -25,7 +25,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub const ID: &str = "pocketpad";
 pub const NAME: &str = "PocketPad";
 pub const VERSION: &str = "1.0.0";
-pub const DESCRIPTION: &str = "Jogue pelo celular olhando para a tela do PC: abra o QR no canto da tela. /pocketpad mostra ou esconde o QR.";
+pub const DESCRIPTION: &str = "Play with your phone as the controller: scan the QR in the corner of the screen. /pocketpad shows or hides the QR.";
 /// Primeira porta tentada; se estiver ocupada, as próximas 9.
 pub const PORT: u16 = 8790;
 /// Sem mensagem do celular por esse tempo, o controle é solto (celular caiu).
@@ -754,7 +754,7 @@ pub fn start() {
                     });
             }
             None => {
-                s.error = Some(format!("portas {PORT}-{} ocupadas", PORT + 9));
+                s.error = Some(format!("ports {PORT}-{} in use", PORT + 9));
                 eprintln!("[{ID}] sem porta livre");
             }
         }
@@ -1537,7 +1537,7 @@ impl Matrix {
 // A página do controle (tema Minecraft, deitada, toque com vários dedos).
 
 pub const PAGE: &str = r####"<!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-visual">
@@ -1716,17 +1716,17 @@ body.loading #load{display:flex}
 <div id="hint"><div data-tk="look" data-t="" data-s="2"></div><div data-tk="tapuse" data-t="" data-s="2"></div></div>
 <div id="st"><i></i><span id="stt" data-t="" data-s="2"></span></div>
 <div id="top">
-  <button class="tb" data-b="9" data-ico="pause" aria-label="Pausa"></button>
-  <button class="tb" id="chatBtn" data-ico="chat" aria-label="Chat"></button>
-  <button class="tb" data-b="12" data-ico="eye" aria-label="Câmera"></button>
-  <button class="tb" id="cfgBtn" data-ico="gear" aria-label="Ajustes"></button>
+  <button class="tb" data-b="9" data-ico="pause" aria-label="Pause" data-al="pause"></button>
+  <button class="tb" id="chatBtn" data-ico="chat" aria-label="Chat" data-al="chat"></button>
+  <button class="tb" data-b="12" data-ico="eye" aria-label="Camera" data-al="camera"></button>
+  <button class="tb" id="cfgBtn" data-ico="gear" aria-label="Settings" data-al="settings"></button>
 </div>
 <div id="dpad"></div>
-<button class="tb" id="jump" data-ico="jump" aria-label="Pular"></button>
-<button class="tb" id="use" data-ico="use" aria-label="Usar"></button>
+<button class="tb" id="jump" data-ico="jump" aria-label="Jump" data-al="jump"></button>
+<button class="tb" id="use" data-ico="use" aria-label="Use" data-al="use"></button>
 <div id="hud">
   <div id="hearts"></div>
-  <div id="barrow"><div id="hotbar"></div><button class="tb" id="more" data-ico="dots" aria-label="Inventário"></button></div>
+  <div id="barrow"><div id="hotbar"></div><button class="tb" id="more" data-ico="dots" aria-label="Inventory" data-al="inventory"></button></div>
 </div>
 <div id="inv">
   <div id="invSide">
@@ -1774,21 +1774,22 @@ const TX={
     msg:"Mensagem ou /comando",play:"Jogar",rotate:"Gire o celular",lying:"O controle funciona deitado.",
     taken:"Outro celular assumiu",takenLong:"Outro celular assumiu o controle. Toque para retomar.",
     start:"Toque para começar. O celular vira o controle do Horizon: olhe para a tela do PC.",qr:"Abra pelo QR que aparece na tela do jogo.",
-    tip1:"Toque: pegar e colocar.",tip2:"Segure e arraste para mover.",hand:"Na mão",items:"{n} itens",sens:"Sensibilidade do olhar",crafting:"Fabricação",inventory:"Inventário"},
+    tip1:"Toque: pegar e colocar.",tip2:"Segure e arraste para mover.",hand:"Na mão",items:"{n} itens",sens:"Sensibilidade do olhar",crafting:"Fabricação",inventory:"Inventário",pause:"Pausa",chat:"Chat",camera:"Câmera",jump:"Pular",use:"Usar"},
   en:{loading:"Loading resources",ldFont:"Font and language",ldCat:"Creative menu",ldModels:"Item models",ldItems:"Building the items",ldTex:"Textures",look:"Drag to look",tapuse:"Tap: use · Hold: break",connecting:"Connecting",connected:"Connected",offline:"No connection",
     close:"Close",fast:"Quick move",half:"Half / one",trash:"Trash",send:"Send",back:"Back",settings:"Settings",done:"Done",
     msg:"Message or /command",play:"Play",rotate:"Rotate your phone",lying:"The controller works in landscape.",
     taken:"Another phone took over",takenLong:"Another phone took over the controller. Tap to take it back.",
     start:"Tap to start. Your phone becomes Horizon's controller: look at the PC screen.",qr:"Open it from the QR code on the game screen.",
-    tip1:"Tap: pick up and place.",tip2:"Hold and drag to move.",hand:"In hand",items:"{n} items",sens:"Look sensitivity",crafting:"Crafting",inventory:"Inventory"},
+    tip1:"Tap: pick up and place.",tip2:"Hold and drag to move.",hand:"In hand",items:"{n} items",sens:"Look sensitivity",crafting:"Crafting",inventory:"Inventory",pause:"Pause",chat:"Chat",camera:"Camera",jump:"Jump",use:"Use"},
   es:{loading:"Cargando recursos",ldFont:"Fuente e idioma",ldCat:"Menú del creativo",ldModels:"Modelos de los objetos",ldItems:"Montando los objetos",ldTex:"Texturas",look:"Arrastra para mirar",tapuse:"Toca: usar · Mantén: romper",connecting:"Conectando",connected:"Conectado",offline:"Sin conexión",
     close:"Cerrar",fast:"Mover rápido",half:"Mitad / uno",trash:"Papelera",send:"Enviar",back:"Volver",settings:"Ajustes",done:"Listo",
     msg:"Mensaje o /comando",play:"Jugar",rotate:"Gira el móvil",lying:"El mando funciona en horizontal.",
     taken:"Otro móvil tomó el control",takenLong:"Otro móvil tomó el control. Toca para recuperarlo.",
     start:"Toca para empezar. El móvil es el mando de Horizon: mira la pantalla del PC.",qr:"Ábrelo desde el QR de la pantalla del juego.",
-    tip1:"Toca: coger y colocar.",tip2:"Mantén y arrastra para mover.",hand:"En la mano",items:"{n} objetos",sens:"Sensibilidad de la vista",crafting:"Fabricación",inventory:"Inventario"},
+    tip1:"Toca: coger y colocar.",tip2:"Mantén y arrastra para mover.",hand:"En la mano",items:"{n} objetos",sens:"Sensibilidad de la vista",crafting:"Fabricación",inventory:"Inventario",pause:"Pausa",chat:"Chat",camera:"Cámara",jump:"Saltar",use:"Usar"},
 };
-let LANG=(()=>{try{const v=localStorage.getItem("cc.lang");if(v)return v;}catch(e){}return(navigator.language||"en-US").toLowerCase().replace("-","_");})();
+// Inglês até o jogo mandar o idioma dele (o último que ele mandou fica guardado).
+let LANG=(()=>{try{const v=localStorage.getItem("cc.glang");if(v)return v;}catch(e){}return"en_us";})();
 function tr(k,n){const d=TX[LANG.slice(0,2)]||TX.en;const t=d[k]??TX.en[k]??k;return n==null?t:t.replace("{n}",n);}
 const $=id=>document.getElementById(id);
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
@@ -1987,6 +1988,7 @@ function applyLang(){
   document.documentElement.lang=LANG.replace("_","-");
   document.querySelectorAll("[data-tk]").forEach(el=>mc(el,el.dataset.g?G(el.dataset.g,el.dataset.tk):tr(el.dataset.tk)));
   $("chatIn").placeholder=tr("msg");
+  document.querySelectorAll("[data-al]").forEach(el=>el.setAttribute("aria-label",tr(el.dataset.al)));
   if(stKey)mc($("stt"),tr(stKey),{s:2});
   if(overKey&&over.style.display!=="none")show(overKey);
   sensLabel();
@@ -1995,7 +1997,7 @@ function applyLang(){
 let langLoading="";
 function setLang(code){
   code=String(code||"").toLowerCase();if(!/^[a-z]{2,3}_[a-z0-9]{2,4}$/.test(code)||code===langLoading)return;
-  langLoading=code;LANG=code;try{localStorage.setItem("cc.lang",code);}catch(e){}
+  langLoading=code;LANG=code;
   LANGP=fetch(`/lang/${code}.json`).then(r=>r.ok?r:fetch("/lang/en_us.json")).then(r=>r.json())
     .then(j=>{if(langLoading!==code)return;names=j;applyLang();}).catch(()=>applyLang());
   return LANGP;
@@ -2374,7 +2376,9 @@ $("win").addEventListener("pointerdown",e=>{swiped=false;swipe=document.body.cla
 $("win").addEventListener("pointermove",e=>{if(dragging||!swipe||e.pointerId!==swipe.id)return;const dy=e.clientY-swipe.y,step=Math.max(24,18*winScale);
   if(Math.abs(dy)>=step){scrollRows(dy>0?1:-1);swipe.y=e.clientY;swiped=true;buzz(5);}});
 $("win").addEventListener("pointerup",()=>{swipe=null;});
-const STATIONS={Crafting:"Bancada",Furnace:"Fornalha",Smoker:"Defumador",BlastFurnace:"Alto-forno",Anvil:"Bigorna",Enchanting:"Mesa de encantamento",Stonecutter:"Cortador de pedras",Loom:"Tear",Grindstone:"Rebolo",Smithing:"Mesa de ferraria",CartographyTable:"Mesa de cartografia"};
+// O título de cada estação: a chave no idioma do jogo e o texto em inglês.
+const STATIONS={Crafting:["container.crafting","Crafting"],Furnace:["block.minecraft.furnace","Furnace"],Smoker:["block.minecraft.smoker","Smoker"],BlastFurnace:["block.minecraft.blast_furnace","Blast Furnace"],Anvil:["block.minecraft.anvil","Anvil"],Enchanting:["block.minecraft.enchanting_table","Enchanting Table"],Stonecutter:["block.minecraft.stonecutter","Stonecutter"],Loom:["block.minecraft.loom","Loom"],Grindstone:["block.minecraft.grindstone","Grindstone"],Smithing:["block.minecraft.smithing_table","Smithing Table"],CartographyTable:["block.minecraft.cartography_table","Cartography Table"]};
+function stationName(st){const e=STATIONS[st];return e?(names[e[0]]||e[1]):st;}
 const GUI="/tex/gui/";
 function L(key,fb){return names[key]||fb;}
 
@@ -2583,7 +2587,7 @@ function renderWin(w){
     sview.style.cssText=`position:absolute;left:${82*k}px;top:${6*k}px;pointer-events:none;z-index:2`;sview.dataset.k=k;
     if(!sbox.isConnected){win.appendChild(sbox);win.appendChild(sview);}drawSearch();}
   else if(sbox.isConnected){sbox.remove();sview.remove();}
-  if(!skin){const title=w.station?(STATIONS[w.station]||w.station):(w.craft===3?"Bancada":"Inventário");
+  if(!skin){const title=w.station?stationName(w.station):w.craft===3?G("container.crafting","crafting"):G("container.inventory","inventory");
     const t=$("winTitle");if(t.dataset.t!==title)mc(t,title,{s:Math.max(1,Math.round(winScale)),c:"#404040",noShadow:true});}
   winSlots=w.slots;
   w.slots.forEach(([i,,,st])=>{const s=slotEls.get(i);const k=JSON.stringify(st);if(s&&s.st!==k){s.st=k;fillSlot(s.el,st,s.size);}});
@@ -2713,7 +2717,7 @@ function setMode(m){if(m===mode)return;const was=mode;mode=m;
 setMode("game");
 let lastState=null;
 function onState(s){
-  lastState=s;loadCatalog(s.cv);if(s.lg&&s.lg!==LANG)setLang(s.lg);setSkin(s.sk,s.sl);preload(s);
+  lastState=s;loadCatalog(s.cv);if(s.lg){if(s.lg!==LANG)setLang(s.lg);try{localStorage.setItem("cc.glang",s.lg);}catch(e){}}setSkin(s.sk,s.sl);preload(s);
   setMode(s.sc==="playing"?"game":(s.win?"inv":"menu"));
   target=s.tg||null;
   (s.hb||[]).forEach((st,i)=>{const k=JSON.stringify(st);if(hs[i].dataset.k!==k){hs[i].dataset.k=k;fillSlot(hs[i],st,38);}hs[i].classList.toggle("sel",i===s.sel);});

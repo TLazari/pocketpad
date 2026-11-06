@@ -63,7 +63,8 @@ O controle precisa estar ligado em Opções > Controles (já vem ligado). Um cel
 - **Chat**: mensagens ao vivo e o teclado do celular para escrever (comandos com `/` também).
 - **Vibração**: o mod ouve a vibração de controle do jogo (dano, bloco quebrado, explosão, totem) e o celular vibra
   junto. No iPhone o Safari não vibra.
-- Os textos usam a fonte do próprio jogo.
+- Os textos usam a fonte do próprio jogo e o idioma dele: a página abre em inglês e troca assim que o jogo diz o
+  idioma (os textos do PocketPad em inglês, português e espanhol; nomes de itens e janelas em qualquer idioma do jogo).
 
 ## Por que WebSocket e não WebRTC
 
