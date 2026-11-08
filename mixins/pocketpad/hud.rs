@@ -21,9 +21,17 @@ fn pocketpad_hud(
     const SUB: u32 = 0x55_5555;
     let s = m::status();
 
-    // Conectado: só o ping, verde, amarelo ou vermelho.
-    if s.connected {
+    // Um celular acabou de ligar: o QR grande sai. Depois, `/pocketpad` ou
+    // "Conectar celular" ainda mostram o QR por cima (para trocar de celular).
+    static WAS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if s.connected && !WAS.swap(true, std::sync::atomic::Ordering::Relaxed) {
         m::qr_connected();
+    } else if !s.connected {
+        WAS.store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    // Conectado: só o ping, verde, amarelo ou vermelho.
+    if s.connected && !m::qr_big() {
         let (line, color) = match s.ping_ms {
             Some(ms) if ms < 60 => (format!("{ms} ms"), 0x55_FF55),
             Some(ms) if ms < 150 => (format!("{ms} ms"), 0xFF_FF55),

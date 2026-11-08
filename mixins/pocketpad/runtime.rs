@@ -396,19 +396,24 @@ pub fn show_qr_big() {
     APPLIED.with(|cell| cell.borrow_mut().qr_big = true);
 }
 
-/// Um celular ligou: o QR grande já fez o trabalho dele.
+/// Um celular acabou de ligar: o QR grande já fez o trabalho dele.
 pub fn qr_connected() {
     APPLIED.with(|cell| cell.borrow_mut().qr_big = false);
 }
 
-/// `/pocketpad`: mostra ou esconde o QR do canto (e fecha o grande).
+/// `/pocketpad`: mostra o QR grande (mesmo com um celular ligado, para trocar
+/// de celular) ou, se algum QR está na tela, esconde.
 pub fn toggle_qr() -> bool {
     APPLIED.with(|cell| {
         let mut a = cell.borrow_mut();
-        let shown = !(a.qr_big || a.qr_shown.unwrap_or(a.qr_auto.unwrap_or(false)));
-        a.qr_big = false;
-        a.qr_shown = Some(shown);
-        shown
+        let visible = a.qr_big || a.qr_shown.unwrap_or(a.qr_auto.unwrap_or(false));
+        if visible {
+            a.qr_big = false;
+            a.qr_shown = Some(false);
+        } else {
+            a.qr_big = true;
+        }
+        !visible
     })
 }
 
@@ -462,6 +467,12 @@ pub fn text(lang: &str, key: &str) -> &'static str {
         "connected" if pt => "Celular conectado",
         "connected" if es => "Móvil conectado",
         "connected" => "Phone connected",
+        "qr_on" if pt => "QR na tela (/pocketpad de novo esconde)",
+        "qr_on" if es => "QR en la pantalla (/pocketpad otra vez lo oculta)",
+        "qr_on" => "QR on the screen (/pocketpad again hides it)",
+        "qr_off" if pt => "QR escondido (/pocketpad mostra)",
+        "qr_off" if es => "QR oculto (/pocketpad lo muestra)",
+        "qr_off" => "QR hidden (/pocketpad shows it)",
         "auto" if pt => "QR no canto ao entrar",
         "auto" if es => "QR en la esquina al entrar",
         "auto" => "QR in the corner on join",

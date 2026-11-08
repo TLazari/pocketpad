@@ -1,4 +1,5 @@
-// /pocketpad (ou /celular): põe o endereço no chat e mostra ou esconde o QR do canto.
+// /pocketpad (ou /celular): mostra ou esconde o QR grande no meio da tela e põe
+// o endereço e o código da sala no chat.
 fn pocketpad_command(game: &mut crate::game::Game<'_>, command: &str, ran: &mut bool) {
     use crate::game::pocketpad as m;
     if !game.native_on(m::ID) || !matches!(command.split(' ').next(), Some("pocketpad" | "celular")) {
@@ -10,15 +11,16 @@ fn pocketpad_command(game: &mut crate::game::Game<'_>, command: &str, ran: &mut 
     let shown = m::toggle_qr();
     // Os textos no idioma do jogo (inglês nos que o mod não traduz).
     let lang = game.settings.language.clone();
-    let (error, starting, qr_on, qr_off) = match lang.get(..2) {
-        Some("pt") => ("erro", "ligando o servidor...", "QR no canto da tela (/pocketpad de novo esconde)", "QR escondido (/pocketpad mostra)"),
-        Some("es") => ("error", "iniciando el servidor...", "QR en la esquina de la pantalla (/pocketpad otra vez lo oculta)", "QR oculto (/pocketpad lo muestra)"),
-        _ => ("error", "starting the server...", "QR in the corner of the screen (/pocketpad again hides it)", "QR hidden (/pocketpad shows it)"),
-    };
+    let t = |k| m::text(&lang, k);
     match (&s.error, s.url.is_empty()) {
-        (Some(e), _) => game.native_chat(&format!("PocketPad: {error}, {e}")),
-        (None, true) => game.native_chat(&format!("PocketPad: {starting}")),
-        (None, false) => game.native_chat(&format!("PocketPad: {}", s.url)),
+        (Some(e), _) => game.native_chat(&format!("PocketPad: {}, {e}", t("error"))),
+        (None, true) => game.native_chat(&format!("PocketPad: {}", t("starting"))),
+        (None, false) => game.native_chat(&format!(
+            "PocketPad: {} · {}: {}",
+            m::short_address(&s.url),
+            t("code"),
+            m::room_code()
+        )),
     }
-    game.native_chat(if shown { qr_on } else { qr_off });
+    game.native_chat(t(if shown { "qr_on" } else { "qr_off" }));
 }
