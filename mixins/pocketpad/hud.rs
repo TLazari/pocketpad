@@ -23,6 +23,7 @@ fn pocketpad_hud(
 
     // Conectado: só o ping, verde, amarelo ou vermelho.
     if s.connected {
+        m::qr_connected();
         let (line, color) = match s.ping_ms {
             Some(ms) if ms < 60 => (format!("{ms} ms"), 0x55_FF55),
             Some(ms) if ms < 150 => (format!("{ms} ms"), 0xFF_FF55),
@@ -34,26 +35,31 @@ fn pocketpad_hud(
         game.native_text(batch, &line, [x + 1.0, y + 1.0], color, true);
         return;
     }
+    m::qr_auto(|| game.native_setting(m::ID, "qr_auto"));
     if !m::qr_shown() {
         return;
     }
+    let big = m::qr_big();
 
-    // Os textos no idioma do jogo.
+    // Os textos no idioma do jogo: o endereço e o código para quem digita.
     let lang = game.settings.language.clone();
-    let (scan, starting, error) = match lang.get(..2) {
-        Some("pt") => ("Leia o QR no mesmo Wi-Fi", "Ligando...", "Erro"),
-        Some("es") => ("Escanea el QR en la misma Wi-Fi", "Iniciando...", "Error"),
-        _ => ("Scan the QR on the same Wi-Fi", "Starting...", "Error"),
-    };
-    let short = s.url.trim_start_matches("http://").to_owned();
+    let t = |k| m::text(&lang, k);
     let (lines, grid): (Vec<String>, _) = match &s.error {
-        Some(e) => (vec![format!("{error}: {e}")], None),
-        None if s.url.is_empty() => (vec![starting.to_owned()], None),
-        None => (vec![scan.to_owned(), short], m::qr_cached(&s.url)),
+        Some(e) => (vec![format!("{}: {e}", t("error"))], None),
+        None if s.url.is_empty() => (vec![t("starting").to_owned()], None),
+        None => (
+            vec![
+                t("scan").to_owned(),
+                m::short_address(&s.url),
+                format!("{}: {}", t("code"), m::room_code()),
+            ],
+            m::qr_cached(&s.url),
+        ),
     };
 
     // Medidas em pixels da interface, como as janelas do jogo (título em 8, 6).
-    let cell = 2.0f32;
+    // O grande fica no meio da tela, com o dobro do tamanho.
+    let cell = if big { 4.0f32 } else { 2.0 };
     let qr_w = grid.as_ref().map_or(0.0, |g| (g.len() + 4) as f32 * cell);
     let title_w = game.native_text_width(m::NAME);
     let text_w = lines
@@ -63,7 +69,11 @@ fn pocketpad_hud(
     let w = (text_w.max(qr_w + 2.0) + 16.0).round();
     let text_h = 10.0 * lines.len() as f32;
     let h = (6.0 + 11.0 + text_h + if grid.is_some() { qr_w + 2.0 + 6.0 } else { 0.0 } + 5.0).round();
-    let (x, y) = corners.place(Corner::TopRight, w, h);
+    let (x, y) = if big {
+        (((batch.width - w) / 2.0).round(), ((batch.height - h) / 2.0).round())
+    } else {
+        corners.place(Corner::TopRight, w, h)
+    };
 
     // A janela: contorno preto com os cantos cortados, luz em cima e à esquerda,
     // sombra embaixo e à direita.

@@ -25,7 +25,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub const ID: &str = "pocketpad";
 pub const NAME: &str = "PocketPad";
 pub const VERSION: &str = "1.0.0";
-pub const DESCRIPTION: &str = "Play with your phone as the controller: scan the QR in the corner of the screen. /pocketpad shows or hides the QR.";
+pub const DESCRIPTION: &str = "Play with your phone as the controller. Open this page and pick \"Connect phone\" to show the QR code; /pocketpad shows or hides it too.";
 /// Primeira porta tentada; se estiver ocupada, as próximas 9.
 pub const PORT: u16 = 8790;
 /// Sem mensagem do celular por esse tempo, o controle é solto (celular caiu).
@@ -273,7 +273,12 @@ pub fn status() -> Status {
 struct Applied {
     input: Input,
     generation: u64,
+    /// `/pocketpad` mostrou (true) ou escondeu (false) o QR do canto.
     qr_shown: Option<bool>,
+    /// "QR no canto ao entrar" (Opções > Mods), lido uma vez do arquivo do mod.
+    qr_auto: Option<bool>,
+    /// O QR grande no meio da tela ("Conectar celular"), até um celular ligar.
+    qr_big: bool,
     /// O último texto mandado de cada tipo (`s` estado, `c` chat): só muda manda.
     sent: HashMap<char, String>,
     last_snapshot: Option<Instant>,
@@ -373,22 +378,104 @@ pub fn rumble(strong: f32, weak: f32, millis: u32) {
     }
 }
 
-/// O QR aparece até o primeiro celular ligar; `/celular` alterna.
+/// O QR sem celular ligado: o grande ("Conectar celular" em Opções > Mods) ou
+/// o do canto (`/pocketpad`, ou "QR no canto ao entrar" ligado).
 pub fn qr_shown() -> bool {
     APPLIED.with(|cell| {
-        // O QR grande aparece sem celular ligado; com um ligado, o HUD mostra o
-        // pequeno. `/celular` esconde ou mostra o grande.
-        cell.borrow().qr_shown.unwrap_or(true)
+        let a = cell.borrow();
+        a.qr_big || a.qr_shown.unwrap_or(a.qr_auto.unwrap_or(false))
     })
 }
 
+/// O QR grande, no meio da tela.
+pub fn qr_big() -> bool {
+    APPLIED.with(|cell| cell.borrow().qr_big)
+}
+
+pub fn show_qr_big() {
+    APPLIED.with(|cell| cell.borrow_mut().qr_big = true);
+}
+
+/// Um celular ligou: o QR grande já fez o trabalho dele.
+pub fn qr_connected() {
+    APPLIED.with(|cell| cell.borrow_mut().qr_big = false);
+}
+
+/// `/pocketpad`: mostra ou esconde o QR do canto (e fecha o grande).
 pub fn toggle_qr() -> bool {
     APPLIED.with(|cell| {
         let mut a = cell.borrow_mut();
-        let shown = !a.qr_shown.unwrap_or(true);
+        let shown = !(a.qr_big || a.qr_shown.unwrap_or(a.qr_auto.unwrap_or(false)));
+        a.qr_big = false;
         a.qr_shown = Some(shown);
         shown
     })
+}
+
+/// "QR no canto ao entrar": `load` lê o arquivo do mod na primeira vez.
+pub fn qr_auto(load: impl FnOnce() -> Option<String>) -> bool {
+    if let Some(v) = APPLIED.with(|cell| cell.borrow().qr_auto) {
+        return v;
+    }
+    let v = load().as_deref() == Some("1");
+    APPLIED.with(|cell| cell.borrow_mut().qr_auto = Some(v));
+    v
+}
+
+pub fn set_qr_auto(on: bool) {
+    APPLIED.with(|cell| {
+        let mut a = cell.borrow_mut();
+        a.qr_auto = Some(on);
+        a.qr_shown = None;
+    });
+}
+
+/// O código da sala: a chave que o celular manda (`?k=` no QR, ou digitada).
+pub fn room_code() -> String {
+    shared().key.clone()
+}
+
+/// O endereço sem a chave (`192.168.1.172:8790`), para digitar no celular.
+pub fn short_address(url: &str) -> String {
+    let u = url.trim_start_matches("http://");
+    u.split(['/', '?']).next().unwrap_or(u).to_owned()
+}
+
+/// Os textos do mod no jogo, no idioma dele (inglês nos que o mod não traduz).
+pub fn text(lang: &str, key: &str) -> &'static str {
+    let pt = lang.starts_with("pt");
+    let es = lang.starts_with("es");
+    match key {
+        "scan" if pt => "Leia o QR no mesmo Wi-Fi",
+        "scan" if es => "Escanea el QR en la misma Wi-Fi",
+        "scan" => "Scan the QR on the same Wi-Fi",
+        "code" if pt => "Código",
+        "code" if es => "Código",
+        "code" => "Code",
+        "starting" if pt => "Ligando...",
+        "starting" if es => "Iniciando...",
+        "starting" => "Starting...",
+        "error" => "Error",
+        "connect" if pt => "Conectar celular (mostrar QR)",
+        "connect" if es => "Conectar el móvil (mostrar QR)",
+        "connect" => "Connect phone (show QR)",
+        "connected" if pt => "Celular conectado",
+        "connected" if es => "Móvil conectado",
+        "connected" => "Phone connected",
+        "auto" if pt => "QR no canto ao entrar",
+        "auto" if es => "QR en la esquina al entrar",
+        "auto" => "QR in the corner on join",
+        "on" if pt => "Sim",
+        "on" if es => "Sí",
+        "on" => "On",
+        "off" if pt => "Não",
+        "off" if es => "No",
+        "off" => "Off",
+        "address" if pt => "Endereço",
+        "address" if es => "Dirección",
+        "address" => "Address",
+        _ => "",
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1623,9 +1710,11 @@ body.inv #use,body.menu #use{display:none}
 #hearts{display:flex;gap:1px;height:14px;align-self:flex-start;margin-left:3px}
 #hearts svg{width:14px;height:14px;shape-rendering:crispEdges}
 #barrow{display:flex;align-items:stretch}
-#hotbar{display:flex;background:rgba(0,0,0,.55);border:2px solid #000;box-shadow:0 0 0 2px #555}
-.hs{position:relative;width:38px;height:38px;border:2px solid rgba(90,90,90,.9)}
-.hs.sel{outline:3px solid #fff;outline-offset:-3px;z-index:1}
+/* A hotbar do jogo (hud/hotbar.png, 182x22: slots de 20 px a partir de 1, 1) em escala 2,
+   e a seleção (hud/hotbar_selection.png, 24x23) 1 px para fora do slot. */
+#hotbar{display:flex;padding:2px;width:364px;height:44px;box-sizing:border-box;background:url(/tex/gui/sprites/hud/hotbar.png) 0 0/364px 44px no-repeat;image-rendering:pixelated}
+.hs{position:relative;width:40px;height:40px}
+.hs.sel::after{content:"";position:absolute;left:-4px;top:-4px;width:48px;height:46px;background:url(/tex/gui/sprites/hud/hotbar_selection.png) 0 0/48px 46px no-repeat;image-rendering:pixelated;pointer-events:none;z-index:1}
 #more{position:relative;width:38px;height:auto;margin-left:4px;background:rgba(0,0,0,.55);border:2px solid #000;box-shadow:0 0 0 2px #555}
 #more.on{background:rgba(150,150,150,.6)}
 body.inv #hud,body.inv #dpad,body.inv #jump,body.inv #top,body.inv #look,body.inv #hint{display:none}
@@ -1694,6 +1783,16 @@ body.chat #chat{display:flex}
 /* Ajustes */
 #cfg{position:fixed;inset:0;display:none;z-index:7;background:rgba(10,8,6,.86);align-items:center;justify-content:center}
 body.cfg #cfg{display:flex}
+/* Editar o HUD: uma camada por cima de tudo pega os toques; as peças ganham contorno. */
+#edit{position:fixed;inset:0;z-index:8;display:none;touch-action:none}
+body.edit #edit{display:block}
+body.edit #hint{visibility:hidden}
+body.edit :is(#dpad,#jump,#use,#hud,#top,#st){outline:2px dashed rgba(255,255,255,.55);outline-offset:3px}
+body.edit :is(#dpad,#jump,#use,#hud,#top,#st).esel{outline:2px solid #f5c542}
+#ebar{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:6px;padding:10px 12px;width:min(300px,60vw);background:rgba(10,8,6,.85);border:2px solid #000;box-shadow:0 0 0 2px #555}
+#ebar input{width:100%;accent-color:#7fc650}
+#ebar .row{display:flex;gap:8px}
+#ebar .btn{position:relative;height:38px;flex:1}
 #cfg .card{width:min(420px,90vw);gap:12px;padding:16px}
 #cfg input{width:100%;accent-color:#7fc650}
 #cfg .row{display:flex;gap:8px}
@@ -1706,6 +1805,7 @@ body.loading #load{display:flex}
 #loadBar i{display:block;height:100%;width:0;background:#fff}
 #over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(20,14,8,.86);z-index:9;text-align:center;padding:24px}
 #over .btn{position:static;height:48px;padding:0 30px}
+#code{width:min(260px,70vw);font:22px ui-monospace,"Courier New",monospace;text-align:center;letter-spacing:3px;padding:8px 10px;background:#000;color:#fff;border:2px solid #a0a0a0;outline:none;user-select:text;-webkit-user-select:text}
 #rot{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:#2a1d12;z-index:10;text-align:center;padding:24px}
 @media (orientation:portrait){#rot{display:flex}}
 </style>
@@ -1751,7 +1851,16 @@ body.loading #load{display:flex}
   <div data-g="options.title" data-tk="settings" data-t="" data-s="3" data-c="#f5c542"></div>
   <div id="sensT"></div>
   <input type="range" id="sens" min="0.3" max="3" step="0.1">
+  <div class="row"><button class="btn" id="editBtn"><span data-tk="editHud" data-t="" data-s="2"></span></button></div>
   <div class="row"><button class="btn" id="cfgOk"><span data-g="gui.done" data-tk="done" data-t="" data-s="2"></span></button></div>
+</div></div>
+<div id="edit"><div id="ebar">
+  <div data-tk="editTip" data-t="" data-s="2" data-c="#a8a8a8"></div>
+  <div data-tk="size" data-t="" data-s="2"></div>
+  <input type="range" id="eSize" min="0.5" max="2" step="0.05">
+  <div data-tk="opacity" data-t="" data-s="2"></div>
+  <input type="range" id="eOp" min="0.2" max="1" step="0.05">
+  <div class="row"><button class="btn" id="eReset"><span data-tk="reset" data-t="" data-s="2"></span></button><button class="btn" id="eDone"><span data-g="gui.done" data-tk="done" data-t="" data-s="2"></span></button></div>
 </div></div>
 <div id="float"></div>
 <div id="load">
@@ -1762,6 +1871,7 @@ body.loading #load{display:flex}
 <div id="over">
   <div data-t="PocketPad" data-s="4" data-c="#f5c542"></div>
   <div id="overt"></div>
+  <input id="code" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="16" placeholder="a1b2c3d4" style="display:none">
   <button class="btn" id="go"><span data-tk="play" data-t="" data-s="3"></span></button>
 </div>
 <div id="rot"><div data-tk="rotate" data-t="" data-s="4" data-c="#f5c542"></div><div data-tk="lying" data-t="" data-s="2"></div></div>
@@ -1769,19 +1879,19 @@ body.loading #load{display:flex}
 "use strict";
 // Os textos do PocketPad em cada idioma (o jogo traduz o resto: ver setLang).
 const TX={
-  pt:{loading:"Carregando recursos",ldFont:"Fonte e idioma",ldCat:"Menu do criativo",ldModels:"Modelos dos itens",ldItems:"Montando os itens",ldTex:"Texturas",look:"Arraste para olhar",tapuse:"Toque: usar · Segure: quebrar",connecting:"Conectando",connected:"Conectado",offline:"Sem conexão",
+  pt:{loading:"Carregando recursos",ldFont:"Fonte e idioma",ldCat:"Menu do criativo",ldModels:"Modelos dos itens",ldItems:"Montando os itens",ldTex:"Texturas",look:"Arraste para olhar",tapuse:"Toque: usar · Segure: quebrar",codeAsk:"Digite o código da sala. No jogo: Opções > Mods > PocketPad > Conectar celular.",codeBad:"Código errado. Confira em Opções > Mods > PocketPad.",editHud:"Editar HUD",editTip:"Toque numa peça e arraste.",size:"Tamanho",opacity:"Opacidade",reset:"Restaurar",connecting:"Conectando",connected:"Conectado",offline:"Sem conexão",
     close:"Fechar",fast:"Mover rápido",half:"Metade / um",trash:"Lixeira",send:"Enviar",back:"Voltar",settings:"Ajustes",done:"Pronto",
     msg:"Mensagem ou /comando",play:"Jogar",rotate:"Gire o celular",lying:"O controle funciona deitado.",
     taken:"Outro celular assumiu",takenLong:"Outro celular assumiu o controle. Toque para retomar.",
     start:"Toque para começar. O celular vira o controle do Horizon: olhe para a tela do PC.",qr:"Abra pelo QR que aparece na tela do jogo.",
     tip1:"Toque: pegar e colocar.",tip2:"Segure e arraste para mover.",hand:"Na mão",items:"{n} itens",sens:"Sensibilidade do olhar",crafting:"Fabricação",inventory:"Inventário",pause:"Pausa",chat:"Chat",camera:"Câmera",jump:"Pular",use:"Usar"},
-  en:{loading:"Loading resources",ldFont:"Font and language",ldCat:"Creative menu",ldModels:"Item models",ldItems:"Building the items",ldTex:"Textures",look:"Drag to look",tapuse:"Tap: use · Hold: break",connecting:"Connecting",connected:"Connected",offline:"No connection",
+  en:{loading:"Loading resources",ldFont:"Font and language",ldCat:"Creative menu",ldModels:"Item models",ldItems:"Building the items",ldTex:"Textures",look:"Drag to look",tapuse:"Tap: use · Hold: break",codeAsk:"Type the room code. In the game: Options > Mods > PocketPad > Connect phone.",codeBad:"Wrong code. Check it in Options > Mods > PocketPad.",editHud:"Edit HUD",editTip:"Tap a piece and drag it.",size:"Size",opacity:"Opacity",reset:"Reset",connecting:"Connecting",connected:"Connected",offline:"No connection",
     close:"Close",fast:"Quick move",half:"Half / one",trash:"Trash",send:"Send",back:"Back",settings:"Settings",done:"Done",
     msg:"Message or /command",play:"Play",rotate:"Rotate your phone",lying:"The controller works in landscape.",
     taken:"Another phone took over",takenLong:"Another phone took over the controller. Tap to take it back.",
     start:"Tap to start. Your phone becomes Horizon's controller: look at the PC screen.",qr:"Open it from the QR code on the game screen.",
     tip1:"Tap: pick up and place.",tip2:"Hold and drag to move.",hand:"In hand",items:"{n} items",sens:"Look sensitivity",crafting:"Crafting",inventory:"Inventory",pause:"Pause",chat:"Chat",camera:"Camera",jump:"Jump",use:"Use"},
-  es:{loading:"Cargando recursos",ldFont:"Fuente e idioma",ldCat:"Menú del creativo",ldModels:"Modelos de los objetos",ldItems:"Montando los objetos",ldTex:"Texturas",look:"Arrastra para mirar",tapuse:"Toca: usar · Mantén: romper",connecting:"Conectando",connected:"Conectado",offline:"Sin conexión",
+  es:{loading:"Cargando recursos",ldFont:"Fuente e idioma",ldCat:"Menú del creativo",ldModels:"Modelos de los objetos",ldItems:"Montando los objetos",ldTex:"Texturas",look:"Arrastra para mirar",tapuse:"Toca: usar · Mantén: romper",codeAsk:"Escribe el código de la sala. En el juego: Opciones > Mods > PocketPad > Conectar el móvil.",codeBad:"Código incorrecto. Revísalo en Opciones > Mods > PocketPad.",editHud:"Editar HUD",editTip:"Toca una pieza y arrástrala.",size:"Tamaño",opacity:"Opacidad",reset:"Restablecer",connecting:"Conectando",connected:"Conectado",offline:"Sin conexión",
     close:"Cerrar",fast:"Mover rápido",half:"Mitad / uno",trash:"Papelera",send:"Enviar",back:"Volver",settings:"Ajustes",done:"Listo",
     msg:"Mensaje o /comando",play:"Jugar",rotate:"Gira el móvil",lying:"El mando funciona en horizontal.",
     taken:"Otro móvil tomó el control",takenLong:"Otro móvil tomó el control. Toca para recuperarlo.",
@@ -1907,7 +2017,7 @@ const cellEl={};
 for(const[k,[cx,cy]]of Object.entries(CELLS)){const el=document.createElement("div");el.className="tb"+(k==="ul"||k==="ur"?" diag":"");
   el.style.left=cx*CELL+"px";el.style.top=cy*CELL+"px";el.innerHTML=svg(k==="mid"?"sneak":k);dpad.appendChild(el);cellEl[k]=el;}
 let dpId=null,dpCell=null,lastUp=0,sneaking=false;
-function cellAt(e){const r=dpad.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/CELL),y=Math.floor((e.clientY-r.top)/CELL);
+function cellAt(e){const r=dpad.getBoundingClientRect(),c=CELL*(r.width/(dpad.offsetWidth||1)),x=Math.floor((e.clientX-r.left)/c),y=Math.floor((e.clientY-r.top)/c);
   for(const[k,[cx,cy]]of Object.entries(CELLS))if(cx===x&&cy===y&&(k!=="ul"&&k!=="ur"||dpad.classList.contains("fwd")))return k;return null;}
 function applyCell(k){
   if(k===dpCell)return;const prev=dpCell;dpCell=k;
@@ -1976,6 +2086,42 @@ $("sens").value=sens;sensLabel();
 $("sens").addEventListener("input",()=>{sens=+$("sens").value;store("sens",sens);sensLabel();});
 $("cfgBtn").addEventListener("click",()=>{document.body.classList.add("cfg");release();});
 $("cfgOk").addEventListener("click",()=>document.body.classList.remove("cfg"));
+
+// ---- Editar o HUD ------------------------------------------------------------
+// D-pad, pular, usar, hotbar, botões de cima e o status: cada peça pode ser
+// arrastada, aumentada ou ficar mais transparente. Fica guardado no celular
+// (translate/scale/opacity por cima do lugar padrão, que "Restaurar" devolve).
+const EDIT=["st","top","jump","use","hud","dpad"];
+let layout={};try{layout=JSON.parse(store("layout")||"{}")||{};}catch(e){layout={};}
+function lay(id){return layout[id]||(layout[id]={x:0,y:0,s:1,o:1});}
+function applyLayout(){EDIT.forEach(id=>{const e=$(id),l=layout[id];
+  e.style.translate=l?`${l.x}px ${l.y}px`:"";e.style.scale=l?String(l.s):"";e.style.opacity=l&&l.o<1?String(l.o):"";});}
+// #top ocupa a largura toda: vale o retângulo dos botões dele.
+function rectOf(id){const e=$(id);if(id!=="top")return e.getBoundingClientRect();
+  const rs=[...e.children].map(c=>c.getBoundingClientRect());
+  return{left:Math.min(...rs.map(r=>r.left)),right:Math.max(...rs.map(r=>r.right)),top:Math.min(...rs.map(r=>r.top)),bottom:Math.max(...rs.map(r=>r.bottom))};}
+function clampIn(id){const r=rectOf(id),l=lay(id);
+  if(r.left<0)l.x-=r.left;else if(r.right>innerWidth)l.x-=r.right-innerWidth;
+  if(r.top<0)l.y-=r.top;else if(r.bottom>innerHeight)l.y-=r.bottom-innerHeight;applyLayout();}
+let esel="dpad",edrag=null;
+function editSelect(id){esel=id;EDIT.forEach(k=>$(k).classList.toggle("esel",k===id));const l=lay(id);$("eSize").value=l.s;$("eOp").value=l.o;}
+function editSave(){store("layout",JSON.stringify(layout));}
+$("editBtn").addEventListener("click",()=>{release();document.body.classList.remove("cfg");document.body.classList.add("edit");editSelect(esel);buzz(10);});
+$("eDone").addEventListener("click",()=>{document.body.classList.remove("edit");EDIT.forEach(k=>$(k).classList.remove("esel"));editSave();buzz(10);});
+$("eReset").addEventListener("click",()=>{layout={};applyLayout();editSelect(esel);editSave();buzz(15);});
+$("eSize").addEventListener("input",e=>{lay(esel).s=+e.target.value;applyLayout();clampIn(esel);});
+$("eOp").addEventListener("input",e=>{lay(esel).o=+e.target.value;applyLayout();});
+const editLayer=$("edit");
+editLayer.addEventListener("pointerdown",e=>{if(e.target.closest("#ebar"))return;
+  const hit=EDIT.find(id=>{const el=$(id);if(getComputedStyle(el).display==="none")return false;const r=rectOf(id);
+    return e.clientX>=r.left-8&&e.clientX<=r.right+8&&e.clientY>=r.top-8&&e.clientY<=r.bottom+8;});
+  if(!hit)return;editSelect(hit);const l=lay(hit);edrag={id:e.pointerId,px:e.clientX,py:e.clientY,x:l.x,y:l.y};
+  editLayer.setPointerCapture(e.pointerId);buzz(8);});
+editLayer.addEventListener("pointermove",e=>{if(!edrag||e.pointerId!==edrag.id)return;const l=lay(esel);
+  l.x=Math.round(edrag.x+e.clientX-edrag.px);l.y=Math.round(edrag.y+e.clientY-edrag.py);applyLayout();});
+const edEnd=e=>{if(!edrag||e.pointerId!==edrag.id)return;edrag=null;clampIn(esel);};
+editLayer.addEventListener("pointerup",edEnd);editLayer.addEventListener("pointercancel",edEnd);
+applyLayout();
 
 // ---- Nomes e ícones dos itens --------------------------------------------
 let names={};
@@ -2720,7 +2866,7 @@ function onState(s){
   lastState=s;loadCatalog(s.cv);if(s.lg){if(s.lg!==LANG)setLang(s.lg);try{localStorage.setItem("cc.glang",s.lg);}catch(e){}}setSkin(s.sk,s.sl);preload(s);
   setMode(s.sc==="playing"?"game":(s.win?"inv":"menu"));
   target=s.tg||null;
-  (s.hb||[]).forEach((st,i)=>{const k=JSON.stringify(st);if(hs[i].dataset.k!==k){hs[i].dataset.k=k;fillSlot(hs[i],st,38);}hs[i].classList.toggle("sel",i===s.sel);});
+  (s.hb||[]).forEach((st,i)=>{const k=JSON.stringify(st);if(hs[i].dataset.k!==k){hs[i].dataset.k=k;fillSlot(hs[i],st,40);}hs[i].classList.toggle("sel",i===s.sel);});
   // No criativo não há vida: os corações somem, como no jogo.
   hearts(s.hp==null||s.cm?null:Math.round(s.hp));
   if(s.win)renderWin(s.win.cr&&CAT.tabs?localCreative(s.win):s.win);else setSearch(false);
@@ -2812,7 +2958,7 @@ async function preload(s){
 
 // ---- Rede ----------------------------------------------------------------------
 let ws=null,lastSend=0,pingT=0;
-const key=new URLSearchParams(location.search).get("k")||"";
+let key=new URLSearchParams(location.search).get("k")||"";
 let stKey="connecting";
 function status(ok,key,raw){stKey=raw?null:key;const text=raw?key:tr(key);$("st").classList.toggle("ok",ok);if($("stt").dataset.t!==text)mc($("stt"),text,{s:2});}
 function send(m){if(ws&&ws.readyState===1)ws.send(m);}
@@ -2848,13 +2994,27 @@ const over=$("over");
 let overKey="";
 function show(key){overKey=key;mc($("overt"),tr(key),{s:2,w:Math.min(460,innerWidth-40)});over.style.display="flex";}
 show("start");
+// Sem o código na URL (o celular não leu o QR): o jogador digita o da sala, e
+// o servidor confere (403 com o código errado) antes de ligar.
+const codeIn=$("code");
+async function askCode(){
+  const c=codeIn.value.trim().toLowerCase();
+  if(!c){codeIn.focus();return false;}
+  let ok=false;try{ok=(await fetch(`/ws?k=${encodeURIComponent(c)}`,{cache:"no-store"})).status!==403;}catch(e){}
+  if(!ok){show("codeBad");buzz(60);codeIn.select();return false;}
+  key=c;codeIn.style.display="none";
+  try{history.replaceState(null,"",location.pathname+"?k="+encodeURIComponent(c));}catch(e){}
+  return true;
+}
+codeIn.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("go").click();}});
 $("go").addEventListener("click",async()=>{
+  if(!key&&!(await askCode()))return;
   over.style.display="none";
   try{await document.documentElement.requestFullscreen({navigationUI:"hide"});}catch(e){}
   try{await screen.orientation.lock("landscape");}catch(e){}
   if(!ws)connect();
 });
-if(!key)show("qr");
+if(!key){show("codeAsk");codeIn.style.display="";}
 document.addEventListener("visibilitychange",()=>{if(document.hidden)release();});
 document.addEventListener("contextmenu",e=>e.preventDefault());
 window.addEventListener("resize",()=>{winKey="";});
@@ -2887,6 +3047,7 @@ if(q.has("demo")){over.style.display="none";
   }else{run();setTimeout(()=>{lastCarried="";winKey="";run();},1500);}
   if(q.has("chat"))openChat(true);
   if(q.has("fwd"))dpad.classList.add("fwd");
+  if(q.has("edit")){if(q.has("moved"))layout={dpad:{x:40,y:-30,s:1.3,o:.7},jump:{x:-60,y:0,s:.8,o:1}};applyLayout();$("editBtn").click();}
   if(q.has("stick")){lstick.style.left="610px";lstick.style.top="220px";lstick.style.display="block";lknob.style.transform="translate(34px,-22px)";$("hint").style.display="none";}
 }
 </script>
@@ -2897,6 +3058,15 @@ if(q.has("demo")){over.style.display="none";
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn address_and_texts() {
+        assert_eq!(short_address("http://192.168.1.172:8790/?k=384e065c"), "192.168.1.172:8790");
+        assert_eq!(short_address(""), "");
+        assert_eq!(text("pt_br", "code"), "Código");
+        assert_eq!(text("ja_jp", "connect"), "Connect phone (show QR)");
+        assert_eq!(text("es_es", "off"), "No");
+    }
 
     #[test]
     fn local_da_skin_como_o_jogo() {
