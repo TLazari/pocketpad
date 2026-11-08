@@ -17,8 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MOD = ROOT / "mixins" / "pocketpad"
 # O horizon-mixins com que o launcher aplica os mixins (`native_mods::MIXINS_REV`
-# do launcher 0.2.28) e a versão do Minecraft da revisão fixada.
-MIXINS = "3f99a5c60dfa311cc365524c44ae2fd799bfa1de"
+# do launcher 0.2.50) e a versão do Minecraft da revisão fixada.
+MIXINS = "5a64af938ec86b00d53d16a408aabc0038fb3e57"
 GAME = "26.3"
 
 
